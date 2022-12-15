@@ -111,3 +111,9 @@ demo/code-*
 demo/favicon.ico
 demo/manifest.json
 demo/playground.js
+conav/static
+conav/code-*
+conav/favicon.ico
+conav/manifest.json
+conav/playground.js
+temp
