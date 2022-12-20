@@ -16,12 +16,7 @@ fse.ensureDir(webConavExPath, err => {
   // dir has now been created, including the directory it is to be placed in
 })
 
-if (fs.existsSync("./temp")) {
-  fs.rmdirSync("./temp", { recursive: true });
-}
-
-child_process.execSync(`git clone https://github.com/nataliechen1/gerrit-vscode-extension.git temp`, {stdio: 'inherit'});
-process.chdir("./temp");
+process.chdir("./gerrit-vscode-extension");
 child_process.execSync('yarn', {stdio: 'inherit'});
 child_process.execSync('yarn package', {stdio: 'inherit'});
 

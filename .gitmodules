@@ -1,0 +1,4 @@
+[submodule "gerrit-vscode-extension"]
+	path = gerrit-vscode-extension
+	url = https://github.com/nataliechen1/gerrit-vscode-extension.git
+	branch = master
