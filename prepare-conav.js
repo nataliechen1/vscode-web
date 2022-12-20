@@ -27,6 +27,7 @@ child_process.execSync('yarn package', {stdio: 'inherit'});
 
 fse.copySync("./dist", "../conav/static/extensions/vscode-gerrit/dist");
 fse.copySync("./package.json", "../conav/static/extensions/vscode-gerrit/package.json");
+fse.copySync("./package.nls.json", "../conav/static/extensions/vscode-gerrit/package.nls.json");
 
 process.chdir("../");
 child_process.execSync("export VERSION=`git describe --always` && tar zcf conav.$VERSION.tar.gz conav/");
