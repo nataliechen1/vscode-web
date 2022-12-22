@@ -64,7 +64,7 @@ class WorkspaceProvider implements IWorkspaceProvider {
 				// Payload
 				case WorkspaceProvider.QUERY_PARAM_PAYLOAD:
 					try {
-						payload = parse(value); // use marshalling#parse() to revive potential URIs
+						payload = Object.entries(parse(value)); // use marshalling#parse() to revive potential URIs
 					} catch (error) {
 						console.error(error); // possible invalid JSON
 					}
@@ -219,15 +219,6 @@ class WorkspaceProvider implements IWorkspaceProvider {
     tempConfig.additionalBuiltinExtensions =
       config.additionalBuiltinExtensions.map((ext) => URI.revive(ext));
     config = tempConfig;
-  }
-
-  let workspace;
-  if (config.folderUri) {
-    workspace = { folderUri: URI.revive(config.folderUri) };
-  } else if (config.workspaceUri) {
-    workspace = { workspaceUri: URI.revive(config.workspaceUri) };
-  } else {
-    workspace = undefined;
   }
 
   const workspaceProvider: IWorkspaceProvider = WorkspaceProvider.create(config);
