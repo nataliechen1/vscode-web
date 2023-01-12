@@ -1,5 +1,7 @@
 import { isStandalone } from 'vs/base/browser/browser';
 import { parse } from 'vs/base/common/marshalling';
+import { Emitter } from 'vs/base/common/event';
+import { Disposable, IDisposable } from 'vs/base/common/lifecycle';
 import { Schemas } from 'vs/base/common/network';
 import { isEqual } from 'vs/base/common/resources';
 import { URI, UriComponents } from 'vs/base/common/uri';
@@ -9,8 +11,116 @@ import { posix } from 'vs/base/common/path';
 import { ltrim } from 'vs/base/common/strings';
 import type { IWorkbenchConstructionOptions } from 'vs/workbench/browser/web.api';
 import type { IWorkspace, IWorkspaceProvider } from 'vs/workbench/services/host/browser/browserHostService';
+import type { IURLCallbackProvider } from 'vs/workbench/services/url/browser/urlService';
 
 declare const window: any;
+
+class LocalStorageURLCallbackProvider extends Disposable implements IURLCallbackProvider {
+
+	private static REQUEST_ID = 0;
+
+	private static QUERY_KEYS: ('scheme' | 'authority' | 'path' | 'query' | 'fragment')[] = [
+		'scheme',
+		'authority',
+		'path',
+		'query',
+		'fragment'
+	];
+
+	private readonly _onCallback = this._register(new Emitter<URI>());
+	readonly onCallback = this._onCallback.event;
+
+	private pendingCallbacks = new Set<number>();
+	private lastTimeChecked = Date.now();
+	private checkCallbacksTimeout: unknown | undefined = undefined;
+	private onDidChangeLocalStorageDisposable: IDisposable | undefined;
+
+	constructor(private readonly _callbackRoute: string) {
+		super();
+	}
+
+	create(options: Partial<UriComponents> = {}): URI {
+		const id = ++LocalStorageURLCallbackProvider.REQUEST_ID;
+		const queryParams: string[] = [`vscode-reqid=${id}`];
+
+		for (const key of LocalStorageURLCallbackProvider.QUERY_KEYS) {
+			const value = options[key];
+
+			if (value) {
+				queryParams.push(`vscode-${key}=${encodeURIComponent(value)}`);
+			}
+		}
+
+		const key = `vscode-web.url-callbacks[${id}]`;
+		window.localStorage.removeItem(key);
+
+		this.pendingCallbacks.add(id);
+		this.startListening();
+
+		return URI.parse(window.location.href).with({ path: this._callbackRoute, query: queryParams.join('&') });
+	}
+
+	private startListening(): void {
+		if (this.onDidChangeLocalStorageDisposable) {
+			return;
+		}
+
+		const fn = () => this.onDidChangeLocalStorage();
+		window.addEventListener('storage', fn);
+		this.onDidChangeLocalStorageDisposable = { dispose: () => window.removeEventListener('storage', fn) };
+	}
+
+	private stopListening(): void {
+		this.onDidChangeLocalStorageDisposable?.dispose();
+		this.onDidChangeLocalStorageDisposable = undefined;
+	}
+
+	// this fires every time local storage changes, but we
+	// don't want to check more often than once a second
+	private async onDidChangeLocalStorage(): Promise<void> {
+		const ellapsed = Date.now() - this.lastTimeChecked;
+
+		if (ellapsed > 1000) {
+			this.checkCallbacks();
+		} else if (this.checkCallbacksTimeout === undefined) {
+			this.checkCallbacksTimeout = setTimeout(() => {
+				this.checkCallbacksTimeout = undefined;
+				this.checkCallbacks();
+			}, 1000 - ellapsed);
+		}
+	}
+
+	private checkCallbacks(): void {
+		let pendingCallbacks: Set<number> | undefined;
+
+		for (const id of this.pendingCallbacks) {
+			const key = `vscode-web.url-callbacks[${id}]`;
+			const result = window.localStorage.getItem(key);
+
+			if (result !== null) {
+				try {
+					this._onCallback.fire(URI.revive(JSON.parse(result)));
+				} catch (error) {
+					console.error(error);
+				}
+
+				pendingCallbacks = pendingCallbacks ?? new Set(this.pendingCallbacks);
+				pendingCallbacks.delete(id);
+				window.localStorage.removeItem(key);
+			}
+		}
+
+		if (pendingCallbacks) {
+			this.pendingCallbacks = pendingCallbacks;
+
+			if (this.pendingCallbacks.size === 0) {
+				this.stopListening();
+			}
+		}
+
+		this.lastTimeChecked = Date.now();
+	}
+}
 
 class WorkspaceProvider implements IWorkspaceProvider {
 
@@ -204,6 +314,7 @@ class WorkspaceProvider implements IWorkspaceProvider {
     folderUri?: UriComponents;
     workspaceUri?: UriComponents;
     domElementId?: string;
+    callbackRoute?: string;
   } = {};
 
   if (window.product) {
@@ -222,7 +333,7 @@ class WorkspaceProvider implements IWorkspaceProvider {
   }
 
   const workspaceProvider: IWorkspaceProvider = WorkspaceProvider.create(config);
-  config = { ...config, workspaceProvider };
+  config = { ...config, workspaceProvider, urlCallbackProvider: new LocalStorageURLCallbackProvider(config.callbackRoute || '/callback'), };
 
   const domElement = !!config.domElementId
     && document.getElementById(config.domElementId)

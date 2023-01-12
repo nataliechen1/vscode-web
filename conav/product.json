@@ -4,7 +4,7 @@
 		"nameLong": "Code Web",
 		"applicationName": "code-web",
 		"dataFolderName": ".vscode-web",
-		"version": "1.67.0",
+		"version": "1.74.0",
 		"extensionEnabledApiProposals": {
 			"osssidstudio.gerrit-vscode-extension": [
 				"timeline",
