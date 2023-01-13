@@ -26,5 +26,12 @@ fse.copySync("./package.json", "../conav/static/extensions/vscode-gerrit/package
 fse.copySync("./package.nls.json", "../conav/static/extensions/vscode-gerrit/package.nls.json");
 
 process.chdir("../");
+const dirCont = fs.readdirSync('.');
+dirCont.forEach( ( elm ) => {
+	if (elm.match(/conav\..*\.tar\.gz/ig)) {
+		fse.removeSync(elm);
+	}
+});
+
 child_process.execSync("export VERSION=`git describe --always` && tar zcf conav.$VERSION.tar.gz conav/");
 
