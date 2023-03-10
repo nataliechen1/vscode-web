@@ -10,7 +10,10 @@
 				"timeline",
 				"textSearchProvider"
 			]
-		}
+		},
+		"trustedExtensionAuthAccess": [
+			"osssidstudio.gerrit-vscode-extension"
+		]
 	},
 	"additionalBuiltinExtensions": [
 		{
