@@ -1,10 +1,13 @@
 import { isStandalone } from 'vs/base/browser/browser';
+import { CancellationToken } from 'vs/base/common/cancellation';
 import { parse } from 'vs/base/common/marshalling';
 import { Emitter } from 'vs/base/common/event';
 import { Disposable, IDisposable } from 'vs/base/common/lifecycle';
 import { Schemas } from 'vs/base/common/network';
 import { isEqual } from 'vs/base/common/resources';
 import { URI, UriComponents } from 'vs/base/common/uri';
+import { request } from 'vs/base/parts/request/browser/request';
+import product from 'vs/platform/product/common/product';
 import { isFolderToOpen, isWorkspaceToOpen } from 'vs/platform/window/common/window';
 import { create } from 'vs/workbench/workbench.web.main';
 import { posix } from 'vs/base/common/path';
@@ -12,8 +15,170 @@ import { ltrim } from 'vs/base/common/strings';
 import type { IWorkbenchConstructionOptions } from 'vs/workbench/browser/web.api';
 import type { IWorkspace, IWorkspaceProvider } from 'vs/workbench/services/host/browser/browserHostService';
 import type { IURLCallbackProvider } from 'vs/workbench/services/url/browser/urlService';
+import type { ICredentialsProvider } from 'vs/platform/credentials/common/credentials';
 
 declare const window: any;
+
+interface ICredential {
+        service: string;
+        account: string;
+        password: string;
+}
+
+class LocalStorageCredentialsProvider implements ICredentialsProvider {
+
+        private static readonly CREDENTIALS_STORAGE_KEY = 'credentials.provider';
+
+        private readonly authService: string | undefined;
+
+        constructor() {
+                let authSessionInfo: { readonly id: string; readonly accessToken: string; readonly providerId: string; readonly canSignOut?: boolean; readonly scopes: string[][] } | undefined;
+                const authSessionElement = document.getElementById('vscode-workbench-auth-session');
+                const authSessionElementAttribute = authSessionElement ? authSessionElement.getAttribute('data-settings') : undefined;
+                if (authSessionElementAttribute) {
+                        try {
+                                authSessionInfo = JSON.parse(authSessionElementAttribute);
+                        } catch (error) { /* Invalid session is passed. Ignore. */ }
+                }
+
+                if (authSessionInfo) {
+                        // Settings Sync Entry
+                        this.setPassword(`${product.urlProtocol}.login`, 'account', JSON.stringify(authSessionInfo));
+
+                        // Auth extension Entry
+                        this.authService = `${product.urlProtocol}-${authSessionInfo.providerId}.login`;
+                        this.setPassword(this.authService, 'account', JSON.stringify(authSessionInfo.scopes.map(scopes => ({
+                                id: authSessionInfo!.id,
+                                scopes,
+                                accessToken: authSessionInfo!.accessToken
+                        }))));
+                }
+        }
+
+        private _credentials: ICredential[] | undefined;
+        private get credentials(): ICredential[] {
+                if (!this._credentials) {
+                        try {
+                                const serializedCredentials = window.localStorage.getItem(LocalStorageCredentialsProvider.CREDENTIALS_STORAGE_KEY);
+                                if (serializedCredentials) {
+                                        this._credentials = JSON.parse(serializedCredentials);
+                                }
+                        } catch (error) {
+                                // ignore
+                        }
+
+                        if (!Array.isArray(this._credentials)) {
+                                this._credentials = [];
+                        }
+                }
+
+                return this._credentials;
+        }
+
+        private save(): void {
+                window.localStorage.setItem(LocalStorageCredentialsProvider.CREDENTIALS_STORAGE_KEY, JSON.stringify(this.credentials));
+        }
+
+        async getPassword(service: string, account: string): Promise<string | null> {
+                return this.doGetPassword(service, account);
+        }
+
+        private async doGetPassword(service: string, account?: string): Promise<string | null> {
+                for (const credential of this.credentials) {
+                        if (credential.service === service) {
+				/*if (typeof account !== 'string' || account === credential.account) {
+                                        return credential.password;
+				}*/
+				return credential.password;
+                        }
+                }
+
+                return null;
+        }
+
+	async setPassword(service: string, account: string, password: string): Promise<void> {
+		var srv = 'code-oss.login';
+		var t = 'account';
+		this.doDeletePassword(srv, t);
+		
+		const value = JSON.parse(password);
+		const sess = JSON.parse(value.content)[0];
+		const pass = { id: sess.id, providerId: value.extensionId, accessToken: sess.accessToken, account: sess.account };
+
+                this.credentials.push({ service: srv, account: t, password: JSON.stringify(pass) });
+
+                this.save();
+
+                try {
+                        if (password && service === this.authService) {
+                                const value = JSON.parse(password);
+                                if (Array.isArray(value) && value.length === 0) {
+                                        await this.logout(service);
+                                }
+                        }
+                } catch (error) {
+                        console.log(error);
+                }
+        }
+
+        async deletePassword(service: string, account: string): Promise<boolean> {
+                const result = await this.doDeletePassword(service, account);
+
+                if (result && service === this.authService) {
+                        try {
+                                await this.logout(service);
+                        } catch (error) {
+                                console.log(error);
+                        }
+                }
+
+                return result;
+        }
+
+        private async doDeletePassword(service: string, account: string): Promise<boolean> {
+                let found = false;
+
+                this._credentials = this.credentials.filter(credential => {
+                        if (credential.service === service && credential.account === account) {
+                                found = true;
+
+                                return false;
+                        }
+
+                        return true;
+                });
+
+                if (found) {
+                        this.save();
+                }
+
+                return found;
+        }
+
+        async findPassword(service: string): Promise<string | null> {
+                return this.doGetPassword(service);
+        }
+
+        async findCredentials(service: string): Promise<Array<{ account: string; password: string }>> {
+                return this.credentials
+                        .filter(credential => credential.service === service)
+                        .map(({ account, password }) => ({ account, password }));
+        }
+
+        private async logout(service: string): Promise<void> {
+                const queryValues: Map<string, string> = new Map();
+                queryValues.set('logout', String(true));
+                queryValues.set('service', service);
+
+                await request({
+                        url: doCreateUri('/auth/logout', queryValues).toString(true)
+                }, CancellationToken.None);
+        }
+
+        async clear(): Promise<void> {
+                window.localStorage.removeItem(LocalStorageCredentialsProvider.CREDENTIALS_STORAGE_KEY);
+        }
+}
 
 class LocalStorageURLCallbackProvider extends Disposable implements IURLCallbackProvider {
 
@@ -308,6 +473,24 @@ class WorkspaceProvider implements IWorkspaceProvider {
 	}
 }
 
+function doCreateUri(path: string, queryValues: Map<string, string>): URI {
+        let query: string | undefined = undefined;
+
+        if (queryValues) {
+                let index = 0;
+                queryValues.forEach((value, key) => {
+                        if (!query) {
+                                query = '';
+                        }
+
+                        const prefix = (index++ === 0) ? '' : '&';
+                        query += `${prefix}${key}=${encodeURIComponent(value)}`;
+                });
+        }
+
+        return URI.parse(window.location.href).with({ path, query });
+}
+
 (async function () {
   // create workbench
   let config: IWorkbenchConstructionOptions & {
@@ -333,7 +516,7 @@ class WorkspaceProvider implements IWorkspaceProvider {
   }
 
   const workspaceProvider: IWorkspaceProvider = WorkspaceProvider.create(config);
-  config = { ...config, workspaceProvider, urlCallbackProvider: new LocalStorageURLCallbackProvider(config.callbackRoute || '/callback'), };
+  config = { ...config, workspaceProvider, urlCallbackProvider: new LocalStorageURLCallbackProvider(config.callbackRoute || '/callback'), credentialsProvider: new LocalStorageCredentialsProvider()};
 
   const domElement = !!config.domElementId
     && document.getElementById(config.domElementId)
