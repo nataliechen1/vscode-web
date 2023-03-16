@@ -33,5 +33,5 @@ dirCont.forEach( ( elm ) => {
 	}
 });
 
-child_process.execSync("export VERSION=`git describe --always` && tar zcf conav.$VERSION.tar.gz conav/");
+child_process.execSync("export VERSION=`git describe --always` && echo VERSION=$VERSION > conav/version && tar zcf conav.$VERSION.tar.gz conav/");
 
