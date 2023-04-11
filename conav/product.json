@@ -6,13 +6,13 @@
 		"dataFolderName": ".vscode-web",
 		"version": "1.74.0",
 		"extensionEnabledApiProposals": {
-			"osssidstudio.gerrit-vscode-extension": [
+			"mtk-vscode.gerrit-vscode-extension": [
 				"timeline",
 				"textSearchProvider"
 			]
 		},
 		"trustedExtensionAuthAccess": [
-			"osssidstudio.gerrit-vscode-extension"
+			"mtk-vscode.gerrit-vscode-extension"
 		]
 	},
 	"additionalBuiltinExtensions": [
