@@ -20,6 +20,10 @@ fs.copyFileSync(
   "../workbench.ts",
   "src/vs/code/browser/workbench/workbench.ts"
 );
+fs.copyFileSync(
+  "../index.html",
+  "src/vs/workbench/contrib/webview/browser/pre/index.html"
+);
 
 // Compile
 child_process.execSync("yarn gulp vscode-web-min", { stdio: "inherit" });

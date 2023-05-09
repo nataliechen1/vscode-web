@@ -512,7 +512,9 @@ function doCreateUri(path: string, queryValues: Map<string, string>): URI {
 
     tempConfig.additionalBuiltinExtensions =
       config.additionalBuiltinExtensions.map((ext) => URI.revive(ext));
+    tempConfig.webviewEndpoint = location.origin + '/static/out/vs/workbench/contrib/webview/browser/pre/';
     config = tempConfig;
+
   }
 
   const workspaceProvider: IWorkspaceProvider = WorkspaceProvider.create(config);
