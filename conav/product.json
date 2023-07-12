@@ -1,8 +1,8 @@
 {
 	"productConfiguration": {
-		"nameShort": "Code Web",
-		"nameLong": "Code Web",
-		"applicationName": "code-web",
+		"nameShort": "CoNav",
+		"nameLong": "Code Navigation",
+		"applicationName": "conav",
 		"dataFolderName": ".vscode-web",
 		"version": "1.74.0",
 		"extensionEnabledApiProposals": {
