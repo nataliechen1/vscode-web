@@ -16,6 +16,7 @@ import type { IWorkbenchConstructionOptions } from 'vs/workbench/browser/web.api
 import type { IWorkspace, IWorkspaceProvider } from 'vs/workbench/services/host/browser/browserHostService';
 import type { IURLCallbackProvider } from 'vs/workbench/services/url/browser/urlService';
 import type { ICredentialsProvider } from 'vs/platform/credentials/common/credentials';
+import type { IUpdate, IUpdateProvider } from 'vs/workbench/services/update/browser/updateService';
 
 declare const window: any;
 
@@ -23,6 +24,24 @@ interface ICredential {
         service: string;
         account: string;
         password: string;
+}
+
+class ConavUpdateProvider implements IUpdateProvider {
+
+	async checkForUpdate(): Promise<IUpdate | null> {
+		const currVersion = window.localStorage.getItem("conav.version");
+		const result = await fetch("/version");
+		const versionString = await result.text();
+		if (versionString) {
+			const version = versionString.split('=')[1];
+			if (version != currVersion) {
+				window.localStorage.setItem("conav.version", version);
+				return {version: version};
+			}
+		}
+		return null;
+	}
+
 }
 
 class LocalStorageCredentialsProvider implements ICredentialsProvider {
@@ -518,7 +537,7 @@ function doCreateUri(path: string, queryValues: Map<string, string>): URI {
   }
 
   const workspaceProvider: IWorkspaceProvider = WorkspaceProvider.create(config);
-  config = { ...config, workspaceProvider, urlCallbackProvider: new LocalStorageURLCallbackProvider(config.callbackRoute || '/callback'), credentialsProvider: new LocalStorageCredentialsProvider()};
+  config = { ...config, workspaceProvider, updateProvider: new ConavUpdateProvider(), urlCallbackProvider: new LocalStorageURLCallbackProvider(config.callbackRoute || '/callback'), credentialsProvider: new LocalStorageCredentialsProvider()};
 
   const domElement = !!config.domElementId
     && document.getElementById(config.domElementId)
