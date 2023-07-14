@@ -15,6 +15,9 @@
 			"mtk-vscode.gerrit-vscode-extension"
 		]
 	},
+	"additionalTrustedDomains": [
+		"https://*.mediatek.inc"
+	],
 	"additionalBuiltinExtensions": [
 		{
 			"scheme": "https",
