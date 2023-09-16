@@ -8,6 +8,7 @@
 		"extensionEnabledApiProposals": {
 			"mtk-vscode.gerrit-vscode-extension": [
 				"timeline",
+				"fileSearchProvider",
 				"textSearchProvider"
 			]
 		},
