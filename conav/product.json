@@ -4,7 +4,7 @@
 		"nameLong": "Code Navigation",
 		"applicationName": "conav",
 		"dataFolderName": ".vscode-web",
-		"version": "1.75.1",
+		"version": "1.83.1",
 		"extensionEnabledApiProposals": {
 			"mtk-vscode.gerrit-vscode-extension": [
 				"timeline",
