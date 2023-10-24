@@ -1,7 +1,7 @@
 {
 	"productConfiguration": {
 		"nameShort": "CoNav",
-		"nameLong": "Code Navigation",
+		"nameLong": "Instant/All Branches Code Search",
 		"applicationName": "conav",
 		"dataFolderName": ".vscode-web",
 		"version": "1.83.1",
