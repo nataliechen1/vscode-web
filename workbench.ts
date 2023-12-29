@@ -426,6 +426,16 @@ class WorkspaceProvider implements IWorkspaceProvider {
 				case WorkspaceProvider.QUERY_PARAM_PAYLOAD:
 					try {
 						payload = Object.entries(parse(value)); // use marshalling#parse() to revive potential URIs
+						const idx = payload.findIndex((ss: any) => ss.filter((s: any) => s === 'openFile').length > 0);
+						let file = payload[idx][1];
+						if (!file.includes('://')) {
+							let ss = file.split(':/');
+							const host = URI.parse(window.location.href);
+							workspace = { folderUri: URI.from({ scheme: 'conav', path: ss[0] + ':/', authority: host.authority }) };
+							foundWorkspace = true;
+							file = workspace.folderUri.scheme + '://' + host.authority + file;
+							payload[idx][1] = file;
+						}
 					} catch (error) {
 						console.error(error); // possible invalid JSON
 					}
