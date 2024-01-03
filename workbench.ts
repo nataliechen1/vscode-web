@@ -11,8 +11,7 @@ import { isFolderToOpen, isWorkspaceToOpen } from 'vs/platform/window/common/win
 import { create } from 'vs/workbench/workbench.web.main';
 import { posix } from 'vs/base/common/path';
 import { ltrim } from 'vs/base/common/strings';
-import type { IWorkbenchConstructionOptions } from 'vs/workbench/browser/web.api';
-import type { IWorkspace, IWorkspaceProvider } from 'vs/workbench/services/host/browser/browserHostService';
+import type { IWorkbenchConstructionOptions, IWorkspace, IWorkspaceProvider } from 'vs/workbench/browser/web.api';
 import type { IURLCallbackProvider } from 'vs/workbench/services/url/browser/urlService';
 import type { IUpdate, IUpdateProvider } from 'vs/workbench/services/update/browser/updateService';
 import { ISecretStorageProvider } from 'vs/platform/secrets/common/secrets';
