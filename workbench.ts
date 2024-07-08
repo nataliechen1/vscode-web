@@ -379,13 +379,15 @@ class WorkspaceProvider implements IWorkspaceProvider {
 	private static QUERY_PARAM_WORKSPACE = 'workspace';
 
 	private static QUERY_PARAM_PAYLOAD = 'payload';
+	private static QUERY_PARAM_OPENFILE = 'openFile';
 
 	static create(config: IWorkbenchConstructionOptions & { folderUri?: UriComponents; workspaceUri?: UriComponents }) {
 		let foundWorkspace = false;
 		let workspace: IWorkspace;
 		let payload = Object.create(null);
 
-		const query = new URL(document.location.href).searchParams;
+		const toOpen = new URL(document.location.href);
+		const query = toOpen.searchParams;
 		query.forEach((value, key) => {
 			switch (key) {
 
@@ -419,6 +421,35 @@ class WorkspaceProvider implements IWorkspaceProvider {
 				case WorkspaceProvider.QUERY_PARAM_EMPTY_WINDOW:
 					workspace = undefined;
 					foundWorkspace = true;
+					break;
+
+				// openfile
+				case WorkspaceProvider.QUERY_PARAM_OPENFILE:
+					try {
+						console.log(`value=${value}`);
+						if (!value.includes('://')) {
+							let ss = value.split('?');
+							let query = '';
+							if (ss.length > 1) {
+								const params = new URLSearchParams(ss[1]);
+								params.delete('rev')
+								query = params.toString();
+							}
+							const host = URI.parse(window.location.href);
+							workspace = { folderUri: URI.from({ scheme: 'manifest', path: '/', authority: host.authority, query: query }) };
+							console.log(workspace);
+							foundWorkspace = true;
+							let file = workspace.folderUri.scheme + '://' + host.authority + value;
+							payload = Object.entries({'openFile': file});
+							const lines = toOpen.hash;
+							if (lines) {
+								payload = Object.entries({'openFile': file, "gotoLineMode": lines.substring(1)})
+							}
+							console.log(`payload=${payload}`);
+						}
+					} catch (error) {
+						console.error(error); // possible invalid JSON
+					}
 					break;
 
 				// Payload
