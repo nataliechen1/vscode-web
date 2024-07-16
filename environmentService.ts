@@ -373,7 +373,6 @@ export class BrowserWorkbenchEnvironmentService implements IBrowserWorkbenchEnvi
 						} else {
 							const query = new URLSearchParams(fileUri.query)
 							const conavUri = fileUri.with({path: `/${query.get('rev') || ''}:${fileUri.path}`});
-							query.delete('rev');
 							filesToOpen.push({
 								fileUri: conavUri.with({query: query.toString()}),
 								options: {
