@@ -372,7 +372,7 @@ export class BrowserWorkbenchEnvironmentService implements IBrowserWorkbenchEnvi
 							});
 						} else {
 							const query = new URLSearchParams(fileUri.query)
-							const conavUri = fileUri.with({path: `/${query.get('rev') || ''}:${fileUri.path}`});
+							const conavUri = fileUri.with({path: query.get('rev') ? `/${query.get('rev')}:${fileUri.path}` : fileUri.path});
 							filesToOpen.push({
 								fileUri: conavUri.with({query: query.toString()}),
 								options: {
