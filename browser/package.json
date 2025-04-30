@@ -1,0 +1,29 @@
+{
+  "name": "workbench",
+  "version": "0.0.1",
+  "scripts": {
+    "compile": "tsc -b ./ && npm run compile-fs-provider",
+    "empty": "npm run compile && node ."
+  },
+  "main": "./out/index.js",
+  "engines": {
+    "node": ">=16"
+  },
+  "dependencies": {
+    "vscode-uri": "^3.0.8",
+    "webpack": "^5.99.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.9",
+    "typescript": "^5.8.3"
+  },
+  "license": "MIT",
+  "author": "Visual Studio Code Team",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/microsoft/vscode-test-web.git"
+  },
+  "bugs": {
+    "url": "https://github.com/microsoft/vscode-test-web/issues"
+  }
+}

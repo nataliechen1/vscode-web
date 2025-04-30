@@ -1,29 +1,40 @@
-import { isStandalone } from 'vs/base/browser/browser';
-import { VSBuffer, decodeBase64, encodeBase64 } from 'vs/base/common/buffer';
-import { parse } from 'vs/base/common/marshalling';
-import { Emitter } from 'vs/base/common/event';
-import { Disposable, IDisposable } from 'vs/base/common/lifecycle';
-import { Schemas } from 'vs/base/common/network';
-import { isEqual } from 'vs/base/common/resources';
-import { URI, UriComponents } from 'vs/base/common/uri';
-import product from 'vs/platform/product/common/product';
-import { isFolderToOpen, isWorkspaceToOpen } from 'vs/platform/window/common/window';
-import { create } from 'vs/workbench/workbench.web.main';
-import { posix } from 'vs/base/common/path';
-import { ltrim } from 'vs/base/common/strings';
-import type { IWorkbenchConstructionOptions, IWorkspace, IWorkspaceProvider } from 'vs/workbench/browser/web.api';
-import type { IURLCallbackProvider } from 'vs/workbench/services/url/browser/urlService';
-import type { IUpdate, IUpdateProvider } from 'vs/workbench/services/update/browser/updateService';
-import { ISecretStorageProvider } from 'vs/platform/secrets/common/secrets';
-import { AuthenticationSessionInfo } from 'vs/workbench/services/authentication/browser/authenticationService';
+
+import { Disposable, ltrim, posix, VSBuffer, decodeBase64, encodeBase64, parse, create, IUpdate, IUpdateProvider, ISecretStorageProvider, IWorkspaceProvider, IWorkbenchConstructionOptions, UriComponents, IWorkspace, URI, IURLCallbackProvider, Emitter, IDisposable, IWindowOpenable, IWorkspaceToOpen, IFolderToOpen} from './workbench.api';
+
+export type AuthenticationSessionInfo = { readonly id: string; readonly accessToken: string; readonly providerId: string; readonly canSignOut?: boolean };
 
 declare const window: any;
+
+function isEqual(uri1: URI | undefined, uri2: URI | undefined): boolean {
+	if (uri1 === uri2) {
+		return true;
+	}
+	if (!uri1 || !uri2) {
+		return false;
+	}
+	return getComparisonKey(uri1) === getComparisonKey(uri2);
+}
+
+function getComparisonKey(uri: URI): string {
+	return uri.with({
+		path: undefined,
+		fragment: undefined
+	}).toString();
+}
+
+export function isWorkspaceToOpen(uriToOpen: IWindowOpenable): uriToOpen is IWorkspaceToOpen {
+	return !!(uriToOpen as IWorkspaceToOpen).workspaceUri;
+}
+
+export function isFolderToOpen(uriToOpen: IWindowOpenable): uriToOpen is IFolderToOpen {
+	return !!(uriToOpen as IFolderToOpen).folderUri;
+}
 
 class ConavUpdateProvider implements IUpdateProvider {
 
 	async checkForUpdate(): Promise<IUpdate | null> {
 		const currVersion = window.localStorage.getItem("conav.version");
-		const result = await fetch("/version");
+		const result = await fetch("version");
 		const versionString = await result.text();
 		if (versionString) {
 			const version = versionString.split('=')[1];
@@ -91,7 +102,7 @@ class ServerKeyedAESCrypto implements ISecretStorageCrypto {
                 // Base64 encode the result and store the ciphertext, the key, and the IV in localStorage
                 // Note that the clientKey and IV don't need to be secret
                 const result = new Uint8Array([...clientKey, ...iv, ...new Uint8Array(cipherText)]);
-                return encodeBase64(VSBuffer.wrap(result));
+                return encodeBase64(VSBuffer.wrap(result), true, false);
         }
 
         async unseal(data: string): Promise<string> {
@@ -226,7 +237,7 @@ class LocalStorageSecretStorageProvider implements ISecretStorageProvider {
                 const record: Record<string, string> = {};
 
                 // Settings Sync Entry
-                record[`${product.urlProtocol}.loginAccount`] = JSON.stringify(authSessionInfo);
+                record[`https.loginAccount`] = JSON.stringify(authSessionInfo);
 
 		const authAccount = JSON.stringify({ extensionId: 'mtk-vscode.gerrit-vscode-extension', key: 'conav.auth' });
 		record[authAccount] = JSON.stringify(authSessionInfo.scopes.map(scopes => ({
@@ -277,7 +288,7 @@ class LocalStorageURLCallbackProvider extends Disposable implements IURLCallback
 		'fragment'
 	];
 
-	private readonly _onCallback = this._register(new Emitter<URI>());
+	private readonly _onCallback = new Emitter<URI>();
 	readonly onCallback = this._onCallback.event;
 
 	private pendingCallbacks = new Set<number>();
@@ -397,7 +408,7 @@ class WorkspaceProvider implements IWorkspaceProvider {
 						// when connected to a remote and having a value
 						// that is a path (begins with a `/`), assume this
 						// is a vscode-remote resource as simplified URL.
-						workspace = { folderUri: URI.from({ scheme: Schemas.vscodeRemote, path: value, authority: config.remoteAuthority }) };
+						workspace = { folderUri: URI.from({ scheme: 'vscode-remote', path: value, authority: config.remoteAuthority }) };
 					} else {
 						workspace = { folderUri: URI.parse(value) };
 					}
@@ -410,7 +421,7 @@ class WorkspaceProvider implements IWorkspaceProvider {
 						// when connected to a remote and having a value
 						// that is a path (begins with a `/`), assume this
 						// is a vscode-remote resource as simplified URL.
-						workspace = { workspaceUri: URI.from({ scheme: Schemas.vscodeRemote, path: value, authority: config.remoteAuthority }) };
+						workspace = { workspaceUri: URI.from({ scheme: 'vscode-remote', path: value, authority: config.remoteAuthority }) };
 					} else {
 						workspace = { workspaceUri: URI.parse(value) };
 					}
@@ -506,14 +517,7 @@ class WorkspaceProvider implements IWorkspaceProvider {
 				window.location.href = targetHref;
 				return true;
 			} else {
-				let result;
-				if (isStandalone()) {
-					result = window.open(targetHref, '_blank', 'toolbar=no'); // ensures to open another 'standalone' window!
-				} else {
-					result = window.open(targetHref);
-				}
-
-				return !!result;
+				return !!window.open(targetHref);
 			}
 		}
 		return false;
@@ -530,7 +534,7 @@ class WorkspaceProvider implements IWorkspaceProvider {
 		// Folder
 		else if (isFolderToOpen(workspace)) {
 			let queryParamFolder: string;
-			if (this.config.remoteAuthority && workspace.folderUri.scheme === Schemas.vscodeRemote) {
+			if (this.config.remoteAuthority && workspace.folderUri.scheme === 'vscode-remote') {
 				// when connected to a remote and having a folder
 				// for that remote, only use the path as query
 				// value to form shorter, nicer URLs.
@@ -547,7 +551,7 @@ class WorkspaceProvider implements IWorkspaceProvider {
 		// Workspace
 		else if (isWorkspaceToOpen(workspace)) {
 			let queryParamWorkspace: string;
-			if (this.config.remoteAuthority && workspace.workspaceUri.scheme === Schemas.vscodeRemote) {
+			if (this.config.remoteAuthority && workspace.workspaceUri.scheme === 'vscode-remote') {
 				// when connected to a remote and having a workspace
 				// for that remote, only use the path as query
 				// value to form shorter, nicer URLs.
@@ -587,11 +591,11 @@ class WorkspaceProvider implements IWorkspaceProvider {
 	hasRemote(): boolean {
 		if (this.workspace) {
 			if (isFolderToOpen(this.workspace)) {
-				return this.workspace.folderUri.scheme === Schemas.vscodeRemote;
+				return this.workspace.folderUri.scheme === 'vscode-remote';
 			}
 
 			if (isWorkspaceToOpen(this.workspace)) {
-				return this.workspace.workspaceUri.scheme === Schemas.vscodeRemote;
+				return this.workspace.workspaceUri.scheme === 'vscode-remote';
 			}
 		}
 
@@ -622,7 +626,7 @@ function readCookie(name: string): string | undefined {
   if (window.product) {
     config = window.product;
   } else {
-    const result = await fetch("/product.json");
+    const result = await fetch("product.json");
     config = await result.json();
   }
 
@@ -630,7 +634,10 @@ function readCookie(name: string): string | undefined {
     const tempConfig = { ...config };
 
     tempConfig.additionalBuiltinExtensions =
-      config.additionalBuiltinExtensions.map((ext) => URI.revive(ext));
+      config.additionalBuiltinExtensions.map((ext) => {
+			let uri = URI.revive(ext);
+			return URI.parse(location.origin + uri.path);
+  		});
     tempConfig.webviewEndpoint = location.origin + '/static/out/vs/workbench/contrib/webview/browser/pre/';
     config = tempConfig;
 
@@ -641,7 +648,6 @@ function readCookie(name: string): string | undefined {
 
   const workspaceProvider: IWorkspaceProvider = WorkspaceProvider.create(config);
   config = { ...config,
-	windowIndicator: config.windowIndicator ?? { label: '$(remote)', tooltip: `${product.nameShort} Web` },
 	settingsSyncOptions: config.settingsSyncOptions ? { enabled: config.settingsSyncOptions.enabled, } : undefined,
 	workspaceProvider,
 	updateProvider: new ConavUpdateProvider(),
